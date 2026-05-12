@@ -13,7 +13,7 @@ import androidx.core.content.ContextCompat
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.R
 import com.v2ray.ang.contracts.ServiceControl
-import com.v2ray.ang.dto.ProfileItem
+import com.v2ray.ang.dto.entities.ProfileItem
 import com.v2ray.ang.enums.EConfigType
 import com.v2ray.ang.extension.toast
 import com.v2ray.ang.handler.MmkvManager
@@ -22,6 +22,9 @@ import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.handler.SpeedtestManager
 import com.v2ray.ang.service.CoreProxyOnlyService
 import com.v2ray.ang.service.CoreVpnService
+import com.v2ray.ang.service.DialerNativeService
+import com.v2ray.ang.service.DialerWebviewService
+import com.v2ray.ang.service.IDialerService
 import com.v2ray.ang.util.LogUtil
 import com.v2ray.ang.util.MessageUtil
 import com.v2ray.ang.util.Utils
@@ -40,6 +43,7 @@ object CoreServiceManager {
     private val mMsgReceive = ReceiveMessageHandler()
     private var currentConfig: ProfileItem? = null
     private var processFinder: XrayProcessFinder? = null
+    private var browserDialer: IDialerService? = null
 
     var serviceControl: SoftReference<ServiceControl>? = null
         set(value) {
@@ -223,15 +227,33 @@ object CoreServiceManager {
 
         currentConfig = config
         var tunFd = vpnInterface?.fd ?: 0
+        val dialerAddr = if (currentConfig?.browserDialerMode.isNullOrEmpty()) {
+            ""
+        } else {
+            "127.0.0.1:${Utils.findRandomFreePort()}"
+        }
         if (SettingsManager.isUsingHevTun()) {
             tunFd = 0
         }
 
         NotificationManager.showNotification(currentConfig)
+        CoreNativeManager.reconcileBrowserDialer(dialerAddr)
         coreController.startLoop(result.content, tunFd)
 
         if (!coreController.isRunning) {
             error("Core failed to start")
+        }
+
+        if (browserDialer != null) {
+            browserDialer!!.stop()
+            browserDialer = null
+        }
+        if (config.browserDialerMode == "OkHttp") {
+            browserDialer = DialerNativeService()
+            browserDialer!!.start(service, dialerAddr)
+        } else if (config.browserDialerMode == "WebView") {
+            browserDialer = DialerWebviewService()
+            browserDialer!!.start(service, dialerAddr)
         }
 
         MessageUtil.sendMsg2UI(service, AppConfig.MSG_STATE_START_SUCCESS, "")
@@ -255,6 +277,13 @@ object CoreServiceManager {
                     LogUtil.e(AppConfig.TAG, "StartCore-Manager: Failed to stop V2Ray loop", e)
                 }
             }
+        }
+
+        // Close existing browser dialer
+        CoreNativeManager.reconcileBrowserDialer("")
+        if (browserDialer != null) {
+            browserDialer!!.stop()
+            browserDialer = null
         }
 
         MessageUtil.sendMsg2UI(service, AppConfig.MSG_STATE_STOP_SUCCESS, "")
