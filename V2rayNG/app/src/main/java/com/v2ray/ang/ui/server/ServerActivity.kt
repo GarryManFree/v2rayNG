@@ -35,7 +35,7 @@ import com.v2ray.ang.AppConfig.WIREGUARD_LOCAL_ADDRESS_V4
 import com.v2ray.ang.AppConfig.WIREGUARD_LOCAL_MTU
 import com.v2ray.ang.R
 import com.v2ray.ang.compose.AppTopBar
-import com.v2ray.ang.compose.ConfirmDialog
+import com.v2ray.ang.compose.DeleteConfirmDialog
 import com.v2ray.ang.compose.FormDropdownField
 import com.v2ray.ang.compose.FormTextField
 import com.v2ray.ang.compose.SettingsSwitchItem
@@ -255,7 +255,7 @@ fun ServerScreen(
     var finalMask by rememberSaveable { mutableStateOf(initialConfig.finalMask ?: "") }
     var kcpMtu by rememberSaveable { mutableStateOf(initialConfig.kcpMtu?.toString() ?: "") }
     var kcpTti by rememberSaveable { mutableStateOf(initialConfig.kcpTti?.toString() ?: "") }
-    var browserDialerMode by rememberSaveable { mutableStateOf(initialConfig.browserDialerMode ?: browserDialerOptions.firstOrNull() ?: "Disable") }
+    var browserDialerMode by rememberSaveable { mutableStateOf(initialConfig.browserDialerMode?: "") }
     var streamSecurity by rememberSaveable { mutableStateOf(initialConfig.security ?: "") }
     var sni by rememberSaveable { mutableStateOf(initialConfig.sni ?: "") }
     var allowInsecure by rememberSaveable { mutableStateOf(initialConfig.insecure == true) }
@@ -515,10 +515,8 @@ fun ServerScreen(
         }
     }
     if (showDeleteDialog) {
-        ConfirmDialog(
-            message = stringResource(R.string.del_config_comfirm),
-            confirmText = stringResource(android.R.string.ok),
-            dismissText = stringResource(android.R.string.cancel),
+        DeleteConfirmDialog(
+            message = stringResource(R.string.confirm_delete_profile),
             onConfirm = { showDeleteDialog = false; onDelete() },
             onDismiss = { showDeleteDialog = false }
         )
